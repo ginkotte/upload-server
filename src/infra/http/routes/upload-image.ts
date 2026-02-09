@@ -1,7 +1,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import z from 'zod'
-import { db } from '@/infra/db'
-import { schema } from '@/infra/db/schemas'
+import { uploadImage } from '@/app/functions/upload-image'
+import { isLeft, isRight, unwrapEither } from '@/shared/either'
 
 export const uploadImageRoute: FastifyPluginAsyncZod = async server => {
   server.post(
@@ -11,10 +11,8 @@ export const uploadImageRoute: FastifyPluginAsyncZod = async server => {
         summary: 'Upload an image',
         consumes: ['multipart/form-data'],
         response: {
-          201: z.object({ uploadId: z.string() }),
-          409: z
-            .object({ message: z.string() })
-            .describe('Upload alredy exists'),
+          201: z.null().describe('Image uploaded'),
+          400: z.object({ message: z.string() }),
         },
       },
     },
@@ -25,9 +23,26 @@ export const uploadImageRoute: FastifyPluginAsyncZod = async server => {
         },
       })
 
-      console.log(uploadFile)
+      if (!uploadFile) {
+        return reply.status(400).send({ message: 'File is required' })
+      }
 
-      return reply.status(201).send({ uploadId: 'teste' })
+      const result = await uploadImage({
+        fileName: uploadFile.filename,
+        contentType: uploadFile.mimetype,
+        contentStream: uploadFile.file,
+      })
+
+      if (isRight(result)) {
+        return reply.status(201).send(null)
+      }
+
+      const error = unwrapEither(result)
+
+      switch (error.constructor.name) {
+        case 'InvalidFileFormat':
+          return reply.status(400).send({ message: error.message })
+      }
     }
   )
 }
