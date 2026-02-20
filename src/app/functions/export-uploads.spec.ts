@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import dayjs from 'dayjs'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as upload from '@/infra/storage/upload-file-to-storage'
 import { isRight, unwrapEither } from '@/shared/either'
 import { makeUpload } from '@/test/factories/make-upload'
