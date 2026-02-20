@@ -1,70 +1,42 @@
-import { asc, count, desc, ilike } from 'drizzle-orm'
+import { Readable } from 'node:stream'
 import z from 'zod'
 import { db } from '@/infra/db'
 import { schema } from '@/infra/db/schemas'
-import { type Either, makeRight } from '@/shared/either'
+import { uploadFileToStorage } from '@/infra/storage/upload-file-to-storage'
+import { type Either, makeLeft, makeRight } from '@/shared/either'
+import { InvalidFileFormat } from './errors/invalid-file-format'
 
-const getUploadsInput = z.object({
-  searchQuery: z.string().optional(),
-  sortBy: z.enum(['createdAt']).optional(),
-  sortDirection: z.enum(['asc', 'desc']),
-  page: z.number().optional().default(1),
-  pageSize: z.number().optional().default(20),
+const uploadImageInput = z.object({
+  fileName: z.string(),
+  contentType: z.string(),
+  contentStream: z.instanceof(Readable),
 })
 
-type GetUploadsInput = z.input<typeof getUploadsInput>
+type UploadImageInput = z.input<typeof uploadImageInput>
 
-type GetUploadsOutput = {
-  uploads: {
-    id: string
-    name: string
-    remoteKey: string
-    remoteUrl: string
-    createdAt: Date
-  }[]
-  total: number
-}
+const allowedMimeTypes = ['image/jpg', 'image/jpeg', 'image/png', 'image/webp']
 
-export async function getUploads(
-  input: GetUploadsInput
-): Promise<Either<never, GetUploadsOutput>> {
-  const { page, pageSize, searchQuery, sortBy, sortDirection } =
-    getUploadsInput.parse(input)
+export async function uploadImage(
+  input: UploadImageInput
+): Promise<Either<InvalidFileFormat, { url: string }>> {
+  const { fileName, contentType, contentStream } = uploadImageInput.parse(input)
 
-  const [uploads, [{ total }]] = await Promise.all([
-    db
-      .select({
-        id: schema.uploads.id,
-        name: schema.uploads.name,
-        remoteKey: schema.uploads.remoteKey,
-        remoteUrl: schema.uploads.remoteUrl,
-        createdAt: schema.uploads.createdAt,
-      })
-      .from(schema.uploads)
-      .where(
-        searchQuery ? ilike(schema.uploads.name, `%${searchQuery}%`) : undefined
-      )
-      .orderBy(fields => {
-        if (sortBy && sortDirection === 'asc') {
-          return asc(fields[sortBy])
-        }
+  if (!allowedMimeTypes.includes(contentType)) {
+    return makeLeft(new InvalidFileFormat())
+  }
 
-        if (sortBy && sortDirection === 'desc') {
-          return desc(fields[sortBy])
-        }
+  const { key, url } = await uploadFileToStorage({
+    fileName,
+    contentType,
+    contentStream,
+    folder: 'images',
+  })
 
-        return desc(fields.id)
-      })
-      .offset((page - 1) * pageSize)
-      .limit(pageSize),
+  await db.insert(schema.uploads).values({
+    name: fileName,
+    remoteKey: key,
+    remoteUrl: url,
+  })
 
-    db
-      .select({ total: count(schema.uploads.id) })
-      .from(schema.uploads)
-      .where(
-        searchQuery ? ilike(schema.uploads.name, `%${searchQuery}%`) : undefined
-      ),
-  ])
-
-  return makeRight({ uploads, total })
+  return makeRight({ url })
 }
