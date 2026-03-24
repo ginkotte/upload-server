@@ -13,7 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "pretest": "yarn run db:migrate:test",
     "pretest:watch": "yarn run db:migrate:test",
-    "build": "tsup-node"
+    "build": "tsup-node",
+    "start": "node dist/infra/http/server.js"
   },
   "license": "MIT",
   "devDependencies": {

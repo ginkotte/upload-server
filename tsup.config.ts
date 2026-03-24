@@ -5,4 +5,5 @@ export default defineConfig({
   clean: true,
   format: 'esm',
   outDir: 'dist',
+  external: ['**/*.sql'],
 })
