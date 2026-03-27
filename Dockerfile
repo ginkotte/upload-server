@@ -18,7 +18,7 @@ COPY --from=base /usr/src/app/node_modules ./node_modules
 RUN yarn build
 
 # ---------- STAGE 3: deploy ----------
-FROM node:20-alpine3.21 AS deploy
+FROM gcr.io/distroless/nodejs20-debian12 AS deploy
 
 USER 1000
 
@@ -30,4 +30,4 @@ COPY --from=build /usr/src/app/package.json ./package.json
 
 EXPOSE 3333
 
-CMD ["yarn", "start"]
+CMD ["dist/infra/http/server.js"]
