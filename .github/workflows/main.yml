@@ -1,8 +1,10 @@
-name: swidget-server pipe
-'on':
+name: widget-server pipe
+
+on:
   push:
     branches:
-      - main
+      - 'main'
+
 jobs:
   Build:
     name: Build
